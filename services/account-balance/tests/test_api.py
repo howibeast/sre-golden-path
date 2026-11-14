@@ -128,6 +128,19 @@ def test_transactions_do_not_call_the_ledger_and_default_to_twenty():
     assert ledger.calls == []
 
 
+def test_demo_page_shows_the_degraded_warning():
+    with TestClient(app) as client:
+        index = client.get("/")
+        assert index.json()["demo"] == "/demo"
+        page = client.get("/demo")
+        assert page.status_code == 200
+        assert "text/html" in page.headers["content-type"]
+        assert "Pending amounts were not applied" in page.text
+        logo = client.get("/static/sun-international.png")
+        assert logo.status_code == 200
+        assert logo.headers["content-type"].startswith("image/")
+
+
 def test_database_outage_fails_the_read():
     _install(Repo({}, broken=True), Ledger())
     with TestClient(app) as client:

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Account balance</title>
+  <style>
+    :root {
+      --navy: #1b365d;
+      --gold: #9a8456;
+      --ink: #1c2430;
+      --muted: #5c6b7a;
+      --line: #e6e1d6;
+      --paper: #f7f5f1;
+      --warn-bg: #fff4e5;
+      --warn: #8a4b08;
+      --ok: #1d6b45;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.45 "Segoe UI", system-ui, sans-serif;
+    }
+    main {
+      max-width: 32rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 3rem;
+    }
+    .logo {
+      display: block;
+      width: min(100%, 18rem);
+      height: auto;
+      margin-bottom: 1.75rem;
+    }
+    h1 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 1.5rem;
+      font-weight: 650;
+    }
+    .lede {
+      margin: 0.35rem 0 1.5rem;
+      color: var(--muted);
+    }
+    form {
+      display: grid;
+      gap: 0.75rem;
+    }
+    label {
+      grid-column: 1 / -1;
+      font-size: 0.85rem;
+      color: var(--navy);
+      font-weight: 650;
+    }
+    select, button {
+      font: inherit;
+      height: 2.75rem;
+      border-radius: 0.4rem;
+    }
+    select {
+      width: 100%;
+      padding: 0 0.75rem;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+    }
+    button {
+      width: 100%;
+      padding: 0 1rem;
+      border: 0;
+      background: var(--navy);
+      color: #fff;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    @media (min-width: 36rem) {
+      form {
+        grid-template-columns: 1fr auto;
+        align-items: end;
+      }
+      button { width: auto; }
+    }
+    #result, #error {
+      margin-top: 1.25rem;
+      padding: 1.25rem;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--gold);
+      border-radius: 0.4rem;
+    }
+    #banner {
+      margin: 0 0 0.75rem;
+      font-weight: 650;
+    }
+    #banner.ok { color: var(--ok); }
+    #banner.warn {
+      margin: -1.25rem -1.25rem 1rem;
+      padding: 0.85rem 1.25rem;
+      background: var(--warn-bg);
+      color: var(--warn);
+    }
+    #amount {
+      margin: 0;
+      color: var(--navy);
+      font-size: 2.5rem;
+      font-weight: 650;
+      letter-spacing: -0.03em;
+    }
+    #settled, #account-line {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+    }
+    #error { color: var(--warn); border-top-color: var(--warn); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <img class="logo" src="/static/sun-international.png" alt="Sun International">
+    <h1>Account balance</h1>
+    <p class="lede">What this account can spend right now.</p>
+    <form id="read">
+      <label for="account">Account</label>
+      <select id="account">
+        <option value="acc_1001">acc_1001 · R50 hold</option>
+        <option value="acc_1002">acc_1002 · nothing pending</option>
+        <option value="acc_1003">acc_1003 · unconfirmed deposit</option>
+      </select>
+      <button type="submit">Read balance</button>
+    </form>
+    <section id="result" hidden>
+      <p id="banner"></p>
+      <p id="amount"></p>
+      <p id="settled"></p>
+      <p id="account-line"></p>
+    </section>
+    <p id="error" hidden></p>
+  </main>
+  <script>
+    const warnings = {
+      pending_not_applied: "Pending amounts were not applied. This is the settled balance only.",
+      ledger_incomplete: "The ledger reply was incomplete. This is the settled balance only."
+    };
+    const form = document.getElementById("read");
+    const button = form.querySelector("button");
+    const result = document.getElementById("result");
+    const error = document.getElementById("error");
+
+    function rand(display) {
+      return "R" + display;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const accountId = document.getElementById("account").value;
+      button.disabled = true;
+      error.hidden = true;
+      try {
+        const response = await fetch("/accounts/" + encodeURIComponent(accountId) + "/balance");
+        if (!response.ok) {
+          throw new Error("The balance read returned " + response.status + ".");
+        }
+        const body = await response.json();
+        const banner = document.getElementById("banner");
+        if (body.degraded) {
+          banner.className = "warn";
+          banner.textContent = warnings[body.warning] || body.warning || "This balance is degraded.";
+        } else {
+          banner.className = "ok";
+          banner.textContent = "Confirmed";
+        }
+        document.getElementById("amount").textContent = rand(body.available.display);
+        document.getElementById("settled").textContent = "Settled " + rand(body.settled.display);
+        document.getElementById("account-line").textContent = body.account_id + " · " + body.currency;
+        result.hidden = false;
+      } catch (err) {
+        result.hidden = true;
+        error.hidden = false;
+        error.textContent = err.message || "The balance read failed.";
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

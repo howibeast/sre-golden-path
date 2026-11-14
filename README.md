@@ -4,6 +4,12 @@ Prepared by Minenhle Sibanda for the Sun International Senior SRE practical assi
 
 This repo is the kit a product team would pick up, with the Accounts balance read API onboarded onto it. The service is small on purpose. The thing to review is the golden path: one SLO spec, the telemetry rules, the runbook, and the pipeline gate that makes those three mandatory.
 
+## How it fits together
+
+A caller asks the balance service. The service reads Postgres. It asks the ledger only when that account has something pending. If the ledger fails, the read still returns the settled balance and says so.
+
+![A balance read, what watches it, and what ships it](docs/architecture.svg)
+
 ## Run it
 
 Docker is enough. From this directory:
@@ -15,6 +21,7 @@ docker compose up --build
 | What | URL |
 | --- | --- |
 | Balance API | http://localhost:8080 |
+| Balance page | http://localhost:8080/demo |
 | Fake ledger switch | http://localhost:8081/control |
 | Prometheus alerts | http://localhost:9090/alerts |
 | Grafana (anonymous, local only) | http://localhost:3000/d/balance-read |
