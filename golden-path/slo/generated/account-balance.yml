@@ -1,0 +1,116 @@
+# Generated from services/account-balance/slo.yaml by golden-path/slo/generate.py.
+# Do not edit. Change the spec and regenerate.
+# SLO: 99.9% of balance_read over 30d.
+# Error budget: 0.0010 (about 43 minutes of total failure in that window).
+groups:
+  - name: slo-account-balance-balance-read
+    rules:
+      - record: sli:account_balance:balance_read:good_ratio:5m
+        expr: |
+          (sum(rate(http_server_request_duration_seconds_bucket{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..",le="0.2"}[5m]))) / (sum(rate(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..|5.."}[5m])))
+      - record: sli:account_balance:balance_read:good_ratio:30m
+        expr: |
+          (sum(rate(http_server_request_duration_seconds_bucket{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..",le="0.2"}[30m]))) / (sum(rate(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..|5.."}[30m])))
+      - record: sli:account_balance:balance_read:good_ratio:1h
+        expr: |
+          (sum(rate(http_server_request_duration_seconds_bucket{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..",le="0.2"}[1h]))) / (sum(rate(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..|5.."}[1h])))
+      - record: sli:account_balance:balance_read:good_ratio:6h
+        expr: |
+          (sum(rate(http_server_request_duration_seconds_bucket{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..",le="0.2"}[6h]))) / (sum(rate(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..|5.."}[6h])))
+      - record: sli:account_balance:balance_read:good_ratio:3d
+        expr: |
+          (sum(rate(http_server_request_duration_seconds_bucket{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..",le="0.2"}[3d]))) / (sum(rate(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..|5.."}[3d])))
+      - record: sli:account_balance:balance_read:good_ratio:30d
+        expr: |
+          (sum(rate(http_server_request_duration_seconds_bucket{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..",le="0.2"}[30d]))) / (sum(rate(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..|5.."}[30d])))
+      - record: slo:account_balance:balance_read:budget_remaining:30d
+        expr: |
+          1 - ((1 - sli:account_balance:balance_read:good_ratio:30d) / 0.001000)
+      - record: sli:account_balance:balance_read:latency_p99:5m
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name="account-balance",http_route="/accounts/{account_id}/balance"}[5m])))
+      - alert: AccountBalanceReadFastBurn
+        expr: |
+          ((1 - sli:account_balance:balance_read:good_ratio:1h) > 0.014400) and ((1 - sli:account_balance:balance_read:good_ratio:5m) > 0.014400) and (sum(rate(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..|5.."}[5m])) > 0.2)
+        labels:
+          severity: page
+          service: account-balance
+          slo: balance_read
+          owner: accounts-team
+          burn: FastBurn
+        annotations:
+          summary: balance_read on account-balance is burning the error budget (FastBurn).
+          description: |
+            Bad events are above 1.44% on both the 1h and 5m windows (burn 14.4x). That is 2% of the 30-day budget in one hour. Target 0.999 over 30d.
+          runbook: services/account-balance/runbooks/ledger-degraded.md
+      - alert: AccountBalanceReadMediumBurn
+        expr: |
+          ((1 - sli:account_balance:balance_read:good_ratio:6h) > 0.006000) and ((1 - sli:account_balance:balance_read:good_ratio:30m) > 0.006000) and (sum(rate(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..|5.."}[30m])) > 0.2)
+        labels:
+          severity: page
+          service: account-balance
+          slo: balance_read
+          owner: accounts-team
+          burn: MediumBurn
+        annotations:
+          summary: balance_read on account-balance is burning the error budget (MediumBurn).
+          description: |
+            Bad events are above 0.60% on both the 6h and 30m windows (burn 6x). That is 5% of the 30-day budget in six hours. Target 0.999 over 30d.
+          runbook: services/account-balance/runbooks/ledger-degraded.md
+      - alert: AccountBalanceReadSlowBurn
+        expr: |
+          ((1 - sli:account_balance:balance_read:good_ratio:3d) > 0.001000) and ((1 - sli:account_balance:balance_read:good_ratio:6h) > 0.001000) and (sum(rate(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance",http_response_status_code=~"2..|5.."}[6h])) > 0.2)
+        labels:
+          severity: ticket
+          service: account-balance
+          slo: balance_read
+          owner: accounts-team
+          burn: SlowBurn
+        annotations:
+          summary: balance_read on account-balance is burning the error budget (SlowBurn).
+          description: |
+            Bad events are above 0.10% on both the 3d and 6h windows (burn 1x). That is 10% of the 30-day budget in three days. Target 0.999 over 30d.
+          runbook: services/account-balance/runbooks/ledger-degraded.md
+      - alert: AccountBalanceReadLedgerConfirmErrorRateHigh
+        expr: |
+          (sum(rate(ledger_confirm_calls_total{service_name="account-balance",result=~"error|timeout|circuit_open"}[2m])) / sum(rate(ledger_confirm_calls_total{service_name="account-balance"}[2m]))) > 0.0500 and sum(rate(ledger_confirm_calls_total{service_name="account-balance"}[2m])) > 0.1
+        for: 1m
+        labels:
+          severity: page
+          service: account-balance
+          slo: balance_read
+          owner: accounts-team
+          signal: dependency
+        annotations:
+          summary: Ledger confirm calls are failing on the balance read path.
+          description: |
+            This is the cause signal. The balance read should stay fast and successful by serving a degraded settled balance. Page on this alert, not on the SLO, while that mitigation is holding. circuit_open counts as bad so the alert does not clear just because the breaker stopped calling the ledger.
+          runbook: services/account-balance/runbooks/ledger-degraded.md
+      - alert: AccountBalanceReadLedgerConfirmAuthRejected
+        expr: |
+          sum(rate(ledger_confirm_calls_total{service_name="account-balance",result="rejected"}[5m])) > 0
+        for: 2m
+        labels:
+          severity: page
+          service: account-balance
+          owner: accounts-team
+          signal: auth
+        annotations:
+          summary: The ledger is rejecting the balance service credentials.
+          description: |
+            This is a configuration failure, not capacity. Check the ledger token. Do not raise timeouts and do not retry.
+          runbook: services/account-balance/runbooks/ledger-degraded.md
+      - alert: AccountBalanceReadTelemetryAbsent
+        expr: |
+          absent(http_server_request_duration_seconds_count{service_name="account-balance",http_route="/accounts/{account_id}/balance"})
+        for: 10m
+        labels:
+          severity: ticket
+          service: account-balance
+          owner: accounts-team
+          signal: telemetry
+        annotations:
+          summary: Balance-read metrics have been missing for 10 minutes.
+          description: |
+            The SLO is blind without this series. This API is on every page, so silence is more likely a broken pipeline than an idle service.
+          runbook: services/account-balance/runbooks/ledger-degraded.md

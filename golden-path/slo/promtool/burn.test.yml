@@ -1,0 +1,67 @@
+# Rules under test are generated. Regenerate with: python golden-path/slo/generate.py
+rule_files:
+  - ../generated/account-balance.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Every balance read is a fast 200. Nothing should page.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{http_response_status_code="200",http_route="/accounts/{account_id}/balance",le="0.2",service_name="account-balance"}'
+        values: 0+1000x120
+      - series: 'http_server_request_duration_seconds_count{http_response_status_code="200",http_route="/accounts/{account_id}/balance",service_name="account-balance"}'
+        values: 0+1000x120
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: AccountBalanceReadFastBurn
+        exp_alerts: []
+
+  # 2% of reads are 500s. That is above the fast-burn threshold of 1.44%.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{http_response_status_code="200",http_route="/accounts/{account_id}/balance",le="0.2",service_name="account-balance"}'
+        values: 0+980x120
+      - series: 'http_server_request_duration_seconds_count{http_response_status_code="200",http_route="/accounts/{account_id}/balance",service_name="account-balance"}'
+        values: 0+980x120
+      - series: 'http_server_request_duration_seconds_count{http_response_status_code="500",http_route="/accounts/{account_id}/balance",service_name="account-balance"}'
+        values: 0+20x120
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: AccountBalanceReadFastBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              service: account-balance
+              slo: balance_read
+              owner: accounts-team
+              burn: FastBurn
+            exp_annotations:
+              summary: balance_read on account-balance is burning the error budget (FastBurn).
+              description: |
+                Bad events are above 1.44% on both the 1h and 5m windows (burn 14.4x). That is 2% of the 30-day budget in one hour. Target 0.999 over 30d.
+              runbook: services/account-balance/runbooks/ledger-degraded.md
+
+  # 10% of ledger calls fail. The dependency page fires. The balance SLO does not,
+  # because this test does not feed it bad HTTP readings: the mitigation held.
+  - interval: 1m
+    input_series:
+      - series: 'ledger_confirm_calls_total{result="error",service_name="account-balance"}'
+        values: 0+6x15
+      - series: 'ledger_confirm_calls_total{result="ok",service_name="account-balance"}'
+        values: 0+54x15
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AccountBalanceReadLedgerConfirmErrorRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              service: account-balance
+              slo: balance_read
+              owner: accounts-team
+              signal: dependency
+            exp_annotations:
+              summary: Ledger confirm calls are failing on the balance read path.
+              description: |
+                This is the cause signal. The balance read should stay fast and successful by serving a degraded settled balance. Page on this alert, not on the SLO, while that mitigation is holding. circuit_open counts as bad so the alert does not clear just because the breaker stopped calling the ledger.
+              runbook: services/account-balance/runbooks/ledger-degraded.md

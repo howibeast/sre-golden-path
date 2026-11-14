@@ -1,0 +1,65 @@
+{
+  "uid": "balance-read",
+  "title": "Account balance",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Balance reads / s",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"account-balance\",http_route=\"/accounts/{account_id}/balance\"}[1m]))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Share of balance reads outside the SLO",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0 } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 - (sum(rate(http_server_request_duration_seconds_bucket{service_name=\"account-balance\",http_route=\"/accounts/{account_id}/balance\",http_response_status_code=~\"2..\",le=\"0.2\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name=\"account-balance\",http_route=\"/accounts/{account_id}/balance\",http_response_status_code=~\"2..|5..\"}[5m])))"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Ledger confirm error ratio",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(ledger_confirm_calls_total{service_name=\"account-balance\",result=~\"error|timeout|circuit_open\"}[2m])) / sum(rate(ledger_confirm_calls_total{service_name=\"account-balance\"}[2m]))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Degraded balance reads / s",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(balance_read_degraded_total{service_name=\"account-balance\"}[2m]))"
+        }
+      ]
+    }
+  ]
+}

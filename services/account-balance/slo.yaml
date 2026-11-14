@@ -1,0 +1,44 @@
+# One file per service. Change this, then run: python golden-path/slo/generate.py
+# The generated Prometheus rules are what production evaluates. Do not hand-edit them.
+
+service: account-balance
+owner: accounts-team
+environment: production
+cost_centre: accounts
+
+sli:
+  name: balance_read
+  description: >
+    A balance read is good when it returns 2xx within 200ms.
+    4xx is excluded (the caller asked for something we correctly refused).
+    5xx, or anything slower than 200ms, is a bad event.
+  route: /accounts/{account_id}/balance
+
+objective:
+  target: 0.999
+  window: 30d
+
+metrics:
+  histogram: http_server_request_duration_seconds
+  route_label: http_route
+  status_label: http_response_status_code
+  service_label: service_name
+  good_bucket: "0.2"
+
+alerting:
+  # Ignore tiny scrapes so one error in two requests does not page.
+  min_request_rate: 0.2
+  runbook: services/account-balance/runbooks/ledger-degraded.md
+
+dependency:
+  name: ledger_confirm
+  metric: ledger_confirm_calls_total
+  result_label: result
+  # circuit_open stays in the bad set so the alert does not clear just because
+  # the breaker stopped making calls.
+  bad_results: ["error", "timeout", "circuit_open"]
+  auth_result: rejected
+  error_ratio: 0.05
+  window: 2m
+  for: 1m
+  min_rate: 0.1

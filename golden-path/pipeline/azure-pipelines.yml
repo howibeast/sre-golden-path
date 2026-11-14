@@ -1,0 +1,102 @@
+# Golden path delivery template.
+# Product repos extend this. They do not copy the steps.
+#
+#   extends:
+#     template: golden-path/pipeline/azure-pipelines.yml@platform
+#     parameters:
+#       serviceDirectory: .
+#       imageRepository: account-balance
+
+parameters:
+  - name: serviceDirectory
+    type: string
+  - name: imageRepository
+    type: string
+
+stages:
+  - stage: Build
+    jobs:
+      - job: build
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+          - script: python -m compileall ${{ parameters.serviceDirectory }}
+            displayName: Compile
+          - script: >-
+              docker build
+              --target runtime
+              -t ${{ parameters.imageRepository }}:$(Build.BuildId)
+              -f ${{ parameters.serviceDirectory }}/Dockerfile
+              ${{ parameters.serviceDirectory }}
+            displayName: Build image
+
+  - stage: Test
+    dependsOn: Build
+    jobs:
+      - job: test
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements-dev.txt
+              python -m pytest -q
+            displayName: Unit tests
+
+  - stage: Scan
+    dependsOn: Test
+    jobs:
+      - job: scan
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+          - script: |
+              python -m pip install --upgrade pip
+              pip install pip-audit
+              pip-audit -r services/account-balance/requirements.txt --progress-spinner off
+              pip-audit -r services/fake-ledger/requirements.txt --progress-spinner off
+            displayName: Dependency scan
+
+  - stage: Policy
+    dependsOn: Scan
+    jobs:
+      - job: gate
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements-dev.txt
+              python scripts/policy_gate.py
+            displayName: Golden path policy gate
+
+  - stage: Deploy
+    dependsOn: Policy
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: production
+        environment: production
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: echo "The production environment approval is the release gate. This exercise does not push an image or change Azure."
+                  displayName: Record the approval

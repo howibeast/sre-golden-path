@@ -1,0 +1,14 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  account-balance:
+    uses: ./.github/workflows/reusable-service.yml
+    with:
+      service_directory: services/account-balance

@@ -1,0 +1,83 @@
+# Local stack for the golden path.
+# Metrics are scraped from the collector. The app does not expose a /metrics port.
+# Trace sampling happens in the collector. Do not also sample in the app.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  # Drop identifiers before anything is stored. The app should not set these.
+  # This is the backstop.
+  attributes/strip:
+    actions:
+      - key: account_id
+        action: delete
+      - key: url.full
+        action: delete
+      - key: http.url
+        action: delete
+      - key: user.id
+        action: delete
+  # Production default, also used locally so the demo matches the standard.
+  # Metrics are NOT in this pipeline. Sampling metrics would corrupt the SLO.
+  # Steady state keeps 10% of traces. Degraded, slow, and error traces are kept.
+  tail_sampling:
+    decision_wait: 5s
+    num_traces: 20000
+    expected_new_traces_per_sec: 100
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: slow
+        type: latency
+        latency:
+          threshold_ms: 200
+      - name: degraded-reads
+        type: string_attribute
+        string_attribute:
+          key: balance.degraded
+          values: ["true"]
+      - name: baseline
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+  batch:
+    timeout: 2s
+    send_batch_size: 512
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/strip, tail_sampling, batch]
+      exporters: [otlp/jaeger]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
