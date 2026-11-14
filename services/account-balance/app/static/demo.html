@@ -25,7 +25,7 @@
       font: 16px/1.45 "Segoe UI", system-ui, sans-serif;
     }
     main {
-      max-width: 32rem;
+      max-width: 40rem;
       margin: 0 auto;
       padding: 2.5rem 1.25rem 3rem;
     }
@@ -76,12 +76,43 @@
       cursor: pointer;
     }
     button:disabled { opacity: 0.6; cursor: wait; }
+    button.secondary {
+      background: #fff;
+      color: var(--navy);
+      border: 1px solid var(--line);
+    }
+    .actions, .shots {
+      display: grid;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    h2 {
+      margin: 2rem 0 0.35rem;
+      color: var(--navy);
+      font-size: 1.15rem;
+    }
+    .hint { margin: 0 0 0.75rem; color: var(--muted); }
+    .links { margin: 0.75rem 0 0; }
+    .links a { color: var(--navy); }
+    #terminal {
+      margin-top: 0.75rem;
+      min-height: 9rem;
+      max-height: 16rem;
+      overflow: auto;
+      padding: 0.85rem 1rem;
+      background: var(--navy);
+      color: #f4efe4;
+      border-radius: 0.4rem;
+      font: 13px/1.45 ui-monospace, Consolas, monospace;
+      white-space: pre-wrap;
+    }
     @media (min-width: 36rem) {
       form {
         grid-template-columns: 1fr auto;
         align-items: end;
       }
-      button { width: auto; }
+      form button { width: auto; }
+      .actions, .shots { grid-template-columns: 1fr 1fr; }
     }
     #result, #error {
       margin-top: 1.25rem;
@@ -138,6 +169,26 @@
       <p id="account-line"></p>
     </section>
     <p id="error" hidden></p>
+
+    <h2>Ledger incident</h2>
+    <p class="hint">The buttons do what the drill script does. The log is the script output. Only these actions run.</p>
+    <div class="actions">
+      <button type="button" id="drill">Run 3 minute drill</button>
+      <button type="button" id="reset" class="secondary">Reset ledger</button>
+    </div>
+    <div class="shots">
+      <button type="button" class="secondary" data-mode="error">All calls fail</button>
+      <button type="button" class="secondary" data-mode="slow">Ledger goes slow</button>
+      <button type="button" class="secondary" data-mode="reject_auth">Reject the token</button>
+    </div>
+    <pre id="terminal" aria-label="Drill log">Ready. Nothing is running.</pre>
+    <p class="links">
+      <a href="http://localhost:9090/alerts" target="_blank" rel="noopener">Prometheus alerts</a>
+      ·
+      <a href="http://localhost:3000/d/balance-read" target="_blank" rel="noopener">Grafana</a>
+      ·
+      <a href="http://localhost:16686/search?service=account-balance&amp;tags=%7B%22balance.degraded%22%3A%22true%22%7D" target="_blank" rel="noopener">Jaeger</a>
+    </p>
   </main>
   <script>
     const warnings = {
@@ -148,34 +199,75 @@
     const button = form.querySelector("button");
     const result = document.getElementById("result");
     const error = document.getElementById("error");
+    const terminal = document.getElementById("terminal");
+    const drillButton = document.getElementById("drill");
+    let stopDrill = false;
+    let drilling = false;
 
     function rand(display) {
       return "R" + display;
     }
 
+    function term(line) {
+      const current = terminal.textContent;
+      if (current === "" || current === "Ready. Nothing is running.") {
+        terminal.textContent = line;
+      } else {
+        terminal.textContent += "\n" + line;
+      }
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function showBalance(body) {
+      const banner = document.getElementById("banner");
+      if (body.degraded) {
+        banner.className = "warn";
+        banner.textContent = warnings[body.warning] || body.warning || "This balance is degraded.";
+      } else {
+        banner.className = "ok";
+        banner.textContent = "Confirmed";
+      }
+      document.getElementById("amount").textContent = rand(body.available.display);
+      document.getElementById("settled").textContent = "Settled " + rand(body.settled.display);
+      document.getElementById("account-line").textContent = body.account_id + " · " + body.currency;
+      result.hidden = false;
+      error.hidden = true;
+    }
+
+    async function readAccount(accountId) {
+      const started = performance.now();
+      const response = await fetch("/accounts/" + encodeURIComponent(accountId) + "/balance");
+      const elapsed = performance.now() - started;
+      if (!response.ok) {
+        throw new Error("The balance read returned " + response.status + ".");
+      }
+      const body = await response.json();
+      showBalance(body);
+      return { status: response.status, elapsed, body };
+    }
+
+    async function setLedger(mode, errorRate) {
+      const response = await fetch("/demo/ledger", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: mode, error_rate: errorRate })
+      });
+      if (!response.ok) {
+        throw new Error("The ledger switch returned " + response.status + ".");
+      }
+      return response.json();
+    }
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const accountId = document.getElementById("account").value;
       button.disabled = true;
       error.hidden = true;
       try {
-        const response = await fetch("/accounts/" + encodeURIComponent(accountId) + "/balance");
-        if (!response.ok) {
-          throw new Error("The balance read returned " + response.status + ".");
-        }
-        const body = await response.json();
-        const banner = document.getElementById("banner");
-        if (body.degraded) {
-          banner.className = "warn";
-          banner.textContent = warnings[body.warning] || body.warning || "This balance is degraded.";
-        } else {
-          banner.className = "ok";
-          banner.textContent = "Confirmed";
-        }
-        document.getElementById("amount").textContent = rand(body.available.display);
-        document.getElementById("settled").textContent = "Settled " + rand(body.settled.display);
-        document.getElementById("account-line").textContent = body.account_id + " · " + body.currency;
-        result.hidden = false;
+        await readAccount(document.getElementById("account").value);
       } catch (err) {
         result.hidden = true;
         error.hidden = false;
@@ -183,6 +275,74 @@
       } finally {
         button.disabled = false;
       }
+    });
+
+    drillButton.addEventListener("click", async () => {
+      if (drilling) return;
+      drilling = true;
+      stopDrill = false;
+      drillButton.disabled = true;
+      document.getElementById("account").value = "acc_1001";
+      terminal.textContent = "";
+      term("$ python scripts/demo_fault.py --seconds 180");
+      try {
+        await setLedger("intermittent", 0.1);
+        term("ledger control: intermittent, 10% of calls fail");
+        term("Reading acc_1001 for 180 seconds. The ledger alert needs the full three minutes.");
+        const deadline = Date.now() + 180000;
+        let total = 0;
+        let degraded = 0;
+        let slow = 0;
+        const codes = {};
+        while (Date.now() < deadline && !stopDrill) {
+          const sample = await readAccount("acc_1001");
+          total += 1;
+          codes[sample.status] = (codes[sample.status] || 0) + 1;
+          if (sample.elapsed > 200) slow += 1;
+          if (sample.body.degraded) degraded += 1;
+          if (total % 25 === 0) {
+            term("n=" + total + " codes=" + JSON.stringify(codes) + " degraded=" + degraded + " slower_than_200ms=" + slow + " last_ms=" + Math.round(sample.elapsed));
+          }
+          await sleep(100);
+        }
+        term("---");
+        term("requests=" + total + " codes=" + JSON.stringify(codes) + " degraded=" + degraded + " slower_than_200ms=" + slow);
+        term("Alert to look for: AccountBalanceReadLedgerConfirmErrorRateHigh");
+        term("The customer SLO alerts should stay green.");
+        term("Jaeger: service account-balance, tag balance.degraded=true");
+      } catch (err) {
+        term(err.message || "The drill stopped.");
+      } finally {
+        drilling = false;
+        drillButton.disabled = false;
+      }
+    });
+
+    document.getElementById("reset").addEventListener("click", async () => {
+      stopDrill = true;
+      try {
+        await setLedger("ok", 0);
+        term("$ python scripts/demo_fault.py --reset");
+        term("ledger reset to ok");
+        term("The breaker stays open for 30 seconds. The red alert needs about two minutes to go green.");
+      } catch (err) {
+        term(err.message || "Reset failed.");
+      }
+    });
+
+    document.querySelectorAll("[data-mode]").forEach((shot) => {
+      shot.addEventListener("click", async () => {
+        const mode = shot.getAttribute("data-mode");
+        document.getElementById("account").value = "acc_1001";
+        try {
+          await setLedger(mode, 1);
+          term("$ ledger mode " + mode);
+          await readAccount("acc_1001");
+          term("One read of acc_1001 finished. Press Reset ledger when you are done.");
+        } catch (err) {
+          term(err.message || "The switch failed.");
+        }
+      });
     });
   </script>
 </body>

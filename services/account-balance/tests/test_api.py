@@ -136,9 +136,43 @@ def test_demo_page_shows_the_degraded_warning():
         assert page.status_code == 200
         assert "text/html" in page.headers["content-type"]
         assert "Pending amounts were not applied" in page.text
+        assert "Run 3 minute drill" in page.text
+        assert "python scripts/demo_fault.py --seconds 180" in page.text
+        assert "localhost:16686" in page.text
         logo = client.get("/static/sun-international.png")
         assert logo.status_code == 200
         assert logo.headers["content-type"].startswith("image/")
+
+
+def test_demo_ledger_switch_rejects_an_unknown_mode():
+    with TestClient(app) as client:
+        response = client.put("/demo/ledger", json={"mode": "drop-database"})
+    assert response.status_code == 400
+
+
+def test_demo_ledger_switch_forwards_the_known_mode(monkeypatch):
+    captured = {}
+
+    class Reply:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"mode": "intermittent", "error_rate": 0.1}
+
+    def fake_put(url, json, timeout):
+        captured["url"] = url
+        captured["json"] = json
+        captured["timeout"] = timeout
+        return Reply()
+
+    monkeypatch.setattr("app.main.httpx.put", fake_put)
+    with TestClient(app) as client:
+        response = client.put("/demo/ledger", json={"mode": "intermittent", "error_rate": 0.1})
+    assert response.status_code == 200
+    assert response.json()["mode"] == "intermittent"
+    assert captured["json"]["mode"] == "intermittent"
+    assert captured["url"].endswith("/control")
 
 
 def test_database_outage_fails_the_read():

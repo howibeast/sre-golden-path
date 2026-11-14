@@ -16,10 +16,11 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from psycopg_pool import ConnectionPool
 
 from app.db import PostgresRepository
@@ -60,6 +61,14 @@ class TransactionListResponse(BaseModel):
     account_id: str
     limit: int
     transactions: list[TransactionResponse]
+
+
+class DemoLedgerControl(BaseModel):
+    mode: str
+    error_rate: float = Field(default=0.1, ge=0.0, le=1.0)
+
+
+LEDGER_MODES = {"ok", "error", "slow", "reject_auth", "intermittent"}
 
 
 def configure_logging() -> None:
@@ -138,6 +147,29 @@ def create_app() -> FastAPI:
     @app.get("/demo", include_in_schema=False)
     def demo_page():
         return FileResponse(STATIC_DIR / "demo.html", media_type="text/html")
+
+    @app.put("/demo/ledger", include_in_schema=False)
+    def demo_ledger(body: DemoLedgerControl):
+        # The browser cannot call the ledger directly. This forwards the
+        # same switch demo_fault.py uses, and only the modes that switch allows.
+        if body.mode not in LEDGER_MODES:
+            raise HTTPException(status_code=400, detail="unknown mode")
+        ledger_url = os.environ.get("LEDGER_URL", "http://localhost:8081").rstrip("/")
+        try:
+            reply = httpx.put(
+                ledger_url + "/control",
+                json={
+                    "mode": body.mode,
+                    "error_rate": body.error_rate,
+                    "delay_ms": 800,
+                    "status_code": 500,
+                },
+                timeout=2,
+            )
+            reply.raise_for_status()
+        except httpx.HTTPError:
+            raise HTTPException(status_code=503, detail="ledger_unreachable") from None
+        return reply.json()
 
     @app.get("/accounts/{account_id}/balance", response_model=BalanceResponse)
     def read_balance(account_id: str, request: Request, response: Response):
