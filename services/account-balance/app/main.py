@@ -14,8 +14,11 @@ import os
 import re
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from psycopg_pool import ConnectionPool
 
@@ -25,6 +28,7 @@ from app.logic import Account, available_balance, format_minor
 from app import telemetry
 
 ACCOUNT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 log = logging.getLogger("account-balance")
 
 
@@ -128,7 +132,12 @@ def create_app() -> FastAPI:
             "service": "account-balance",
             "balance": "/accounts/{account_id}/balance",
             "transactions": "/accounts/{account_id}/transactions",
+            "demo": "/demo",
         }
+
+    @app.get("/demo", include_in_schema=False)
+    def demo_page():
+        return FileResponse(STATIC_DIR / "demo.html", media_type="text/html")
 
     @app.get("/accounts/{account_id}/balance", response_model=BalanceResponse)
     def read_balance(account_id: str, request: Request, response: Response):
@@ -193,6 +202,7 @@ def create_app() -> FastAPI:
             ],
         )
 
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     telemetry.instrument_app(app)
     return app
 

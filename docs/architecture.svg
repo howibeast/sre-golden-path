@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="700" viewBox="0 0 920 700" role="img" aria-labelledby="title desc">
+  <title id="title">Account balance architecture</title>
+  <desc id="desc">A balance read goes to account-balance, then Postgres, and to the fake ledger only when something is pending. Spans and metrics go to the OpenTelemetry collector, then Jaeger and Prometheus. The SLO spec becomes burn alerts in Prometheus, which Grafana reads. A pull request passes build, test, scan, and policy before the production approval on main.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#1b365d"/>
+    </marker>
+  </defs>
+  <rect width="920" height="700" fill="#f7f5f1"/>
+
+  <g font-family="Segoe UI, sans-serif">
+    <rect x="16" y="16" width="888" height="210" rx="12" fill="#ffffff" stroke="#e6e1d6"/>
+    <text x="36" y="48" fill="#1b365d" font-size="16" font-weight="600">A balance read</text>
+    <rect x="36" y="72" width="190" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="131" y="100" text-anchor="middle" fill="#1b365d" font-size="14">Demo page or k6</text>
+    <line x1="226" y1="96" x2="292" y2="96" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="300" y="72" width="230" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="415" y="100" text-anchor="middle" fill="#1b365d" font-size="14">account-balance :8080</text>
+    <line x1="530" y1="96" x2="612" y2="96" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="620" y="72" width="160" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="700" y="100" text-anchor="middle" fill="#1b365d" font-size="14">Postgres</text>
+    <line x1="415" y1="120" x2="415" y2="156" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="428" y="146" fill="#5c6b7a" font-size="13">only when something is pending</text>
+    <rect x="300" y="160" width="230" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="415" y="188" text-anchor="middle" fill="#1b365d" font-size="14">fake ledger :8081</text>
+  </g>
+
+  <g font-family="Segoe UI, sans-serif">
+    <rect x="16" y="242" width="888" height="250" rx="12" fill="#ffffff" stroke="#e6e1d6"/>
+    <text x="36" y="274" fill="#1b365d" font-size="16" font-weight="600">What watches it</text>
+    <rect x="36" y="296" width="160" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="116" y="324" text-anchor="middle" fill="#1b365d" font-size="14">account-balance</text>
+    <line x1="196" y1="320" x2="352" y2="320" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="274" y="308" text-anchor="middle" fill="#5c6b7a" font-size="12">spans and metrics</text>
+    <rect x="360" y="296" width="220" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="470" y="324" text-anchor="middle" fill="#1b365d" font-size="14">OpenTelemetry collector</text>
+    <line x1="580" y1="320" x2="632" y2="320" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="640" y="296" width="170" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="725" y="324" text-anchor="middle" fill="#1b365d" font-size="14">Jaeger :16686</text>
+
+    <rect x="36" y="400" width="120" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="96" y="428" text-anchor="middle" fill="#1b365d" font-size="14">slo.yaml</text>
+    <line x1="156" y1="424" x2="188" y2="424" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="196" y="400" width="150" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="271" y="428" text-anchor="middle" fill="#1b365d" font-size="14">burn alerts</text>
+    <line x1="346" y1="424" x2="458" y2="424" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="466" y="400" width="180" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="556" y="428" text-anchor="middle" fill="#1b365d" font-size="14">Prometheus :9090</text>
+    <line x1="646" y1="424" x2="698" y2="424" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="706" y="400" width="170" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="791" y="428" text-anchor="middle" fill="#1b365d" font-size="14">Grafana :3000</text>
+    <path d="M 470 344 V 384 H 556 V 400" fill="none" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="482" y="376" fill="#5c6b7a" font-size="12">metrics</text>
+  </g>
+
+  <g font-family="Segoe UI, sans-serif">
+    <rect x="16" y="508" width="888" height="168" rx="12" fill="#ffffff" stroke="#e6e1d6"/>
+    <text x="36" y="544" fill="#1b365d" font-size="16" font-weight="600">What ships it</text>
+    <rect x="36" y="580" width="170" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="121" y="608" text-anchor="middle" fill="#1b365d" font-size="14">pull request</text>
+    <line x1="206" y1="604" x2="268" y2="604" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="276" y="580" width="280" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="416" y="608" text-anchor="middle" fill="#1b365d" font-size="14">build, test, scan, policy</text>
+    <line x1="556" y1="604" x2="648" y2="604" stroke="#1b365d" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="602" y="592" text-anchor="middle" fill="#5c6b7a" font-size="12">merge to main</text>
+    <rect x="656" y="580" width="210" height="48" rx="8" fill="#ffffff" stroke="#1b365d"/>
+    <text x="761" y="608" text-anchor="middle" fill="#1b365d" font-size="14">production approval</text>
+  </g>
+</svg>
