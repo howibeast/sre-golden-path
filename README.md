@@ -51,6 +51,8 @@ python scripts/demo_fault.py
 python scripts/demo_fault.py --reset
 ```
 
+The same two actions are buttons on http://localhost:8080/demo. The page log is the script output. It does not run any other command.
+
 `demo_fault.py` sets intermittent 10% errors and calls `acc_1001` for about three minutes. Reads should stay HTTP 200. Some bodies come back `degraded: true` with the settled balance and `warning: pending_not_applied`. That is the mitigation: we do not fail the page, and we do not pretend the hold was confirmed.
 
 The alert that should fire is `AccountBalanceReadLedgerConfirmErrorRateHigh`. It is on the ledger's error ratio, not on the customer SLO. The SLO should stay quiet if the mitigation is working. Give Prometheus the three minutes; the rule waits for a 2 minute rate and then 1 minute.

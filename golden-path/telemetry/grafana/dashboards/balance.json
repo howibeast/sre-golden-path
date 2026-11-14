@@ -3,20 +3,85 @@
   "title": "Account balance",
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 3,
   "refresh": "5s",
   "time": { "from": "now-15m", "to": "now" },
   "panels": [
     {
-      "id": 1,
-      "type": "timeseries",
-      "title": "Balance reads / s",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 10,
+      "type": "row",
+      "title": "Error budget",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": []
+    },
+    {
+      "id": 5,
+      "type": "bargauge",
+      "title": "Error budget remaining, 30 days",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.25 },
+              { "color": "green", "value": 0.5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "auto"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"account-balance\",http_route=\"/accounts/{account_id}/balance\"}[1m]))"
+          "expr": "slo:account_balance:balance_read:budget_remaining:30d",
+          "instant": true,
+          "legendFormat": "30-day budget"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Customer promise",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Balance reads / s",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "color": { "mode": "fixed", "fixedColor": "#5794F2" },
+          "custom": { "lineWidth": 2, "fillOpacity": 12 }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"account-balance\",http_route=\"/accounts/{account_id}/balance\"}[1m]))",
+          "legendFormat": "balance reads"
         }
       ]
     },
@@ -24,27 +89,59 @@
       "id": 2,
       "type": "timeseries",
       "title": "Share of balance reads outside the SLO",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0 } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": { "mode": "fixed", "fixedColor": "#FF9830" },
+          "custom": { "lineWidth": 2, "fillOpacity": 12 }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "1 - (sum(rate(http_server_request_duration_seconds_bucket{service_name=\"account-balance\",http_route=\"/accounts/{account_id}/balance\",http_response_status_code=~\"2..\",le=\"0.2\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name=\"account-balance\",http_route=\"/accounts/{account_id}/balance\",http_response_status_code=~\"2..|5..\"}[5m])))"
+          "expr": "(1 - (sum(rate(http_server_request_duration_seconds_bucket{service_name=\"account-balance\",http_route=\"/accounts/{account_id}/balance\",http_response_status_code=~\"2..\",le=\"0.2\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name=\"account-balance\",http_route=\"/accounts/{account_id}/balance\",http_response_status_code=~\"2..|5..\"}[5m])))) > -Inf",
+          "legendFormat": "outside the 200ms promise"
         }
       ]
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Ledger",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "panels": []
     },
     {
       "id": 3,
       "type": "timeseries",
       "title": "Ledger confirm error ratio",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": { "mode": "fixed", "fixedColor": "#F2495C" },
+          "custom": { "lineWidth": 2, "fillOpacity": 12 }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(ledger_confirm_calls_total{service_name=\"account-balance\",result=~\"error|timeout|circuit_open\"}[2m])) / sum(rate(ledger_confirm_calls_total{service_name=\"account-balance\"}[2m]))"
+          "expr": "sum(rate(ledger_confirm_calls_total{service_name=\"account-balance\",result=~\"error|timeout|circuit_open\"}[2m])) / sum(rate(ledger_confirm_calls_total{service_name=\"account-balance\"}[2m]))",
+          "legendFormat": "ledger errors"
         }
       ]
     },
@@ -52,12 +149,32 @@
       "id": 4,
       "type": "timeseries",
       "title": "Degraded balance reads / s",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "color": { "mode": "fixed", "fixedColor": "#FADE2A" },
+          "custom": { "lineWidth": 2, "fillOpacity": 12 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "ledger_incomplete" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#B877D9" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(balance_read_degraded_total{service_name=\"account-balance\"}[2m]))"
+          "expr": "sum by (reason) (rate(balance_read_degraded_total{service_name=\"account-balance\"}[2m]))",
+          "legendFormat": "{{reason}}"
         }
       ]
     }
